@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eco-indicator 99 — LCA Calculator</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="eco99-data.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#2d6a4f;--green-lt:#40916c;--green-bg:#d8f3dc;
+  --amber:#e07b2a;--red:#c0392b;
+  --grey-1:#f8f9fa;--grey-2:#e9ecef;--grey-3:#ced4da;--grey-5:#6c757d;--grey-9:#212529;
+  --white:#ffffff;--shadow:0 2px 8px rgba(0,0,0,.10);--font:'Segoe UI',system-ui,sans-serif;
+}
+body{font-family:var(--font);background:var(--grey-1);color:var(--grey-9);min-height:100vh}
+
+/* Header */
+header{background:var(--green);color:white;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+header h1{font-size:1.25rem;font-weight:700}
+header p{font-size:.8rem;opacity:.85}
+#user-section{display:flex;align-items:center;gap:10px}
+#user-section input{padding:6px 12px;border-radius:6px;border:none;font-size:.85rem;width:180px}
+#btn-set-user{background:var(--green-lt);color:white;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600}
+#user-display{font-size:.85rem;opacity:.9}
+
+/* Layout */
+.app-layout{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 70px)}
+
+/* Sidebar */
+#sidebar{background:var(--white);border-right:1px solid var(--grey-2);padding:20px 16px;overflow-y:auto}
+#sidebar h2{font-size:.9rem;color:var(--grey-5);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+#btn-new-scenario{width:100%;background:var(--green);color:white;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:6px}
+#btn-new-scenario:hover{background:var(--green-lt)}
+.scenario-card{background:var(--grey-1);border:1px solid var(--grey-2);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.scenario-card:hover{border-color:var(--green-lt);box-shadow:var(--shadow)}
+.scenario-card.active{border-color:var(--green);background:var(--green-bg)}
+.scenario-card .s-name{font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scenario-card .s-meta{font-size:.75rem;color:var(--grey-5);margin-top:2px}
+.scenario-card .s-score{font-size:.8rem;font-weight:700;color:var(--green);margin-top:4px}
+.scenario-card .s-actions{display:flex;gap:6px;margin-top:6px}
+.s-actions button{font-size:.7rem;padding:2px 8px;border-radius:4px;border:1px solid var(--grey-3);background:white;cursor:pointer;color:var(--grey-5)}
+.s-actions button:hover{background:var(--grey-2)}
+.s-actions .btn-del{border-color:#f5c6cb;color:var(--red)}
+.s-actions .btn-del:hover{background:#f8d7da}
+.compare-check{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.compare-check input[type=checkbox]{accent-color:var(--green);width:14px;height:14px}
+.compare-check label{font-size:.78rem;color:var(--grey-5);cursor:pointer}
+#btn-compare{width:100%;margin-top:12px;background:var(--amber);color:white;border:none;padding:8px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600}
+#btn-compare:hover{opacity:.9}
+
+/* Main */
+#main{padding:24px;overflow-y:auto}
+
+/* Welcome */
+#welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 20px;color:var(--grey-5)}
+#welcome .big-icon{font-size:4rem;margin-bottom:16px}
+#welcome h2{font-size:1.4rem;color:var(--grey-9);margin-bottom:8px}
+#welcome p{max-width:480px;line-height:1.6;font-size:.95rem}
+#welcome .steps{margin-top:28px;display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+#welcome .step-card{background:white;border:1px solid var(--grey-2);border-radius:10px;padding:16px 20px;width:180px;text-align:center}
+#welcome .step-card .num{font-size:1.5rem;font-weight:800;color:var(--green)}
+#welcome .step-card p{font-size:.8rem;margin-top:4px;color:var(--grey-5)}
+
+/* Editor */
+#editor{display:none}
+.editor-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+.editor-header-left{flex:1;min-width:200px}
+#scenario-name-input{font-size:1.4rem;font-weight:700;border:none;border-bottom:2px solid var(--grey-3);background:transparent;width:100%;padding:4px 0;outline:none;color:var(--grey-9)}
+#scenario-name-input:focus{border-bottom-color:var(--green)}
+#scenario-desc-input{margin-top:6px;font-size:.9rem;border:none;border-bottom:1px solid var(--grey-2);background:transparent;width:100%;padding:3px 0;outline:none;color:var(--grey-5)}
+#scenario-desc-input:focus{border-bottom-color:var(--green-lt)}
+
+/* Functional unit */
+.functional-unit-box{background:white;border:1px solid var(--green-lt);border-left:4px solid var(--green);border-radius:8px;padding:14px 18px;margin-bottom:20px}
+.functional-unit-box label{display:block;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--green);margin-bottom:6px}
+.functional-unit-box textarea{width:100%;border:1px solid var(--grey-3);border-radius:6px;padding:8px 10px;font-size:.88rem;font-family:var(--font);resize:vertical;outline:none;color:var(--grey-9);line-height:1.5;min-height:60px}
+.functional-unit-box textarea:focus{border-color:var(--green-lt)}
+.functional-unit-box .fu-hint{font-size:.75rem;color:var(--grey-5);margin-top:6px;line-height:1.5}
+
+/* Notes */
+.notes-box{background:#fffdf0;border:1px solid #f0d060;border-radius:8px;padding:14px 18px;margin-top:20px}
+.notes-box label{display:block;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9a7d0a;margin-bottom:6px}
+.notes-box textarea{width:100%;border:1px solid #e0c040;border-radius:6px;padding:8px 10px;font-size:.88rem;font-family:var(--font);resize:vertical;outline:none;background:#fffef5;color:var(--grey-9);line-height:1.5;min-height:60px}
+.notes-box textarea:focus{border-color:#c0a000}
+
+/* Score bar */
+.score-bar{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+.score-pill{background:white;border:1px solid var(--grey-2);border-radius:10px;padding:12px 20px;text-align:center;min-width:130px;box-shadow:var(--shadow)}
+.score-pill .label{font-size:.7rem;color:var(--grey-5);text-transform:uppercase;letter-spacing:.05em}
+.score-pill .value{font-size:1.5rem;font-weight:800;color:var(--green);line-height:1.2;margin-top:2px}
+.score-pill .unit{font-size:.7rem;color:var(--grey-5)}
+.score-pill.total{border-color:var(--green);background:var(--green-bg)}
+
+/* Phase tabs */
+.phase-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.phase-tab{padding:8px 18px;border-radius:8px;border:2px solid var(--grey-2);background:white;font-weight:600;font-size:.85rem;cursor:pointer;transition:all .15s;color:var(--grey-5)}
+.phase-tab:hover{border-color:var(--green-lt);color:var(--green-lt)}
+.phase-tab.active{border-color:var(--green);background:var(--green-bg);color:var(--green)}
+.phase-section{display:none}
+.phase-section.active{display:block}
+
+/* Phase intro */
+.phase-intro{background:white;border:1px solid var(--grey-2);border-left:4px solid var(--green-lt);border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:.88rem;line-height:1.6;color:var(--grey-5)}
+.phase-intro strong{color:var(--grey-9)}
+
+/* Entry table */
+.entry-table{width:100%;background:white;border-radius:10px;border:1px solid var(--grey-2);overflow:hidden;box-shadow:var(--shadow);margin-bottom:16px}
+.entry-table table{width:100%;border-collapse:collapse}
+.entry-table thead th{background:var(--grey-2);padding:10px 14px;text-align:left;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--grey-5);font-weight:700}
+.entry-table tbody tr{border-top:1px solid var(--grey-2)}
+.entry-table tbody tr:hover{background:var(--grey-1)}
+.entry-table td{padding:8px 14px;font-size:.88rem;vertical-align:middle}
+.entry-table td select,.entry-table td input[type=number]{border:1px solid var(--grey-3);border-radius:6px;padding:5px 8px;font-size:.85rem;background:white;outline:none;width:100%}
+.entry-table td select:focus,.entry-table td input[type=number]:focus{border-color:var(--green-lt)}
+.result-val{font-weight:700;color:var(--green)}
+.result-val.negative{color:var(--red)}
+.btn-remove-row{background:none;border:none;color:var(--grey-3);font-size:1.1rem;cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1}
+.btn-remove-row:hover{color:var(--red);background:#f8d7da}
+.phase-total-row td{background:var(--green-bg);font-weight:700;color:var(--green);font-size:.88rem}
+.btn-add-row{background:white;border:2px dashed var(--green-lt);color:var(--green);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600;width:100%;margin-top:4px;transition:background .15s}
+.btn-add-row:hover{background:var(--green-bg)}
+
+/* Search overlay */
+#search-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center}
+#search-overlay.open{display:flex}
+#search-dialog{background:white;border-radius:14px;width:560px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden}
+#search-dialog header{background:var(--green);padding:14px 20px;border-radius:0;flex-direction:column;align-items:flex-start}
+#search-dialog header h3{font-size:1rem;margin-bottom:10px}
+#search-input{width:100%;padding:8px 12px;border-radius:8px;border:none;font-size:.9rem;outline:none}
+#search-filter-row{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--grey-2);flex-wrap:wrap;background:var(--grey-1)}
+#search-filter-row select{padding:5px 10px;border-radius:6px;border:1px solid var(--grey-3);font-size:.82rem;background:white;outline:none}
+#search-results{flex:1;overflow-y:auto;padding:8px 0}
+.search-result-item{padding:10px 18px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--grey-2);transition:background .1s}
+.search-result-item:hover{background:var(--green-bg)}
+.search-result-item .mat-name{font-weight:600;font-size:.88rem}
+.search-result-item .mat-cat{font-size:.75rem;color:var(--grey-5);margin-top:1px}
+.search-result-item .mat-desc{font-size:.73rem;color:var(--grey-5);margin-top:2px;font-style:italic}
+.search-result-item .mat-val{font-weight:700;color:var(--green);font-size:.88rem;white-space:nowrap;text-align:right}
+.search-result-item .mat-unit{font-size:.7rem;color:var(--grey-5);text-align:right}
+#search-footer{padding:10px 16px;border-top:1px solid var(--grey-2);display:flex;justify-content:flex-end}
+#btn-search-close{background:var(--grey-2);border:none;padding:7px 18px;border-radius:7px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--grey-5)}
+
+/* Charts */
+#charts-section{margin-top:4px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.chart-card{background:white;border:1px solid var(--grey-2);border-radius:10px;padding:20px;box-shadow:var(--shadow)}
+.chart-card h3{font-size:.9rem;color:var(--grey-5);margin-bottom:14px}
+
+/* Compare view */
+#compare-view{display:none}
+.compare-header{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+#btn-back{background:var(--grey-2);border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--grey-5)}
+#btn-back:hover{background:var(--grey-3)}
+.compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.compare-scenario-card{background:white;border:2px solid var(--grey-2);border-radius:10px;padding:16px;text-align:center;box-shadow:var(--shadow)}
+.compare-scenario-card h3{font-size:1rem;font-weight:700;margin-bottom:12px;color:var(--grey-9)}
+.compare-phase-row{display:flex;justify-content:space-between;font-size:.82rem;padding:3px 0;border-bottom:1px solid var(--grey-2)}
+.compare-phase-row:last-child{border:none;font-weight:700;margin-top:4px}
+.compare-phase-row .phase-label{color:var(--grey-5)}
+.compare-phase-row .phase-val{font-weight:600;color:var(--green)}
+
+/* Tooltip */
+.tooltip{position:relative;display:inline-block;cursor:help;color:var(--green-lt);margin-left:4px;font-size:.8rem}
+.tooltip .tip-text{visibility:hidden;background:var(--grey-9);color:white;border-radius:6px;padding:6px 10px;font-size:.75rem;width:240px;position:absolute;z-index:10;bottom:125%;left:50%;transform:translateX(-50%);line-height:1.4;pointer-events:none;box-shadow:var(--shadow)}
+.tooltip:hover .tip-text{visibility:visible}
+
+/* Config banner */
+#config-banner{background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:16px 20px;margin:20px;font-size:.88rem;line-height:1.6;display:none}
+#config-banner.show{display:block}
+#config-banner strong{color:var(--amber)}
+#config-banner code{background:var(--grey-2);padding:2px 6px;border-radius:4px;font-size:.82rem}
+
+/* Sync dot */
+#sync-dot{width:8px;height:8px;border-radius:50%;background:#aaa;display:inline-block;margin-left:8px;vertical-align:middle;transition:background .3s}
+#sync-dot.syncing{background:var(--amber)}
+#sync-dot.synced{background:#52b788}
+
+/* No results */
+.no-results{text-align:center;color:var(--grey-5);padding:30px;font-size:.9rem}
+
+@media(max-width:768px){
+  .app-layout{grid-template-columns:1fr}
+  #sidebar{border-right:none;border-bottom:1px solid var(--grey-2);max-height:280px}
+  #charts-section{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌿 Eco-indicator 99 — LCA Calculator</h1>
+    <p>Based on the Eco-indicator 99 Manual for Designers (Goedkoop et al., PRé Consultants, 2000)</p>
+  </div>
+  <div id="user-section">
+    <input id="user-name-input" type="text" placeholder="Enter your name…" maxlength="40">
+    <button id="btn-set-user">Join</button>
+    <span id="user-display" style="display:none"></span>
+    <span id="sync-dot" title="Sync status"></span>
+  </div>
+</header>
+
+<div id="config-banner" class="show">
+  ⚙️ <strong>Setup needed:</strong> Open this file in a text editor, find <code>PASTE YOUR FIREBASE CONFIG HERE</code>,
+  and replace it with your Firebase project credentials. See <strong>SETUP-GUIDE.md</strong> for step-by-step instructions.
+</div>
+
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <h2>My Scenarios</h2>
+    <button id="btn-new-scenario">＋ New Scenario</button>
+    <div id="scenario-list"></div>
+    <div id="compare-controls" style="display:none;margin-top:16px;border-top:1px solid var(--grey-2);padding-top:16px">
+      <h2 style="margin-bottom:8px">Compare Scenarios</h2>
+      <p style="font-size:.75rem;color:var(--grey-5);margin-bottom:10px">Tick two or more scenarios to compare side by side.</p>
+      <div id="compare-checklist"></div>
+      <button id="btn-compare">📊 Compare Selected</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+
+    <!-- Welcome -->
+    <div id="welcome">
+      <div class="big-icon">🌱</div>
+      <h2>Welcome to the Eco-indicator 99 Calculator</h2>
+      <p>This tool helps you calculate the environmental impact of a product across its entire life cycle — from raw materials to disposal. Click <strong>New Scenario</strong> on the left to get started.</p>
+      <div class="steps">
+        <div class="step-card"><div class="num">1</div><p>Create a scenario and define your functional unit</p></div>
+        <div class="step-card"><div class="num">2</div><p>Add materials, energy, and disposal entries per phase</p></div>
+        <div class="step-card"><div class="num">3</div><p>See your Eco-indicator score and charts</p></div>
+        <div class="step-card"><div class="num">4</div><p>Compare multiple design alternatives side by side</p></div>
+      </div>
+    </div>
+
+    <!-- Editor -->
+    <div id="editor">
+
+      <div class="editor-header">
+        <div class="editor-header-left">
+          <input id="scenario-name-input" type="text" placeholder="Scenario name (e.g. Coffee Machine — Version A)" maxlength="80">
+          <input id="scenario-desc-input" type="text" placeholder="Short description / notes (optional)" maxlength="200">
+        </div>
+        <span style="font-size:.75rem;color:var(--grey-5)" id="author-label"></span>
+      </div>
+
+      <!-- Functional Unit (Step 1 + 3 from the paper) -->
+      <div class="functional-unit-box">
+        <label>Functional Unit
+          <span class="tooltip">ℹ<span class="tip-text">The paper's Steps 1 and 3 require defining exactly what you are analysing and over what time period, so that comparisons between alternatives are fair.</span></span>
+        </label>
+        <textarea id="functional-unit-input" rows="2" placeholder="Example: All materials and energy needed to brew coffee for one household over 5 years, using the machine twice daily at half capacity (5 cups), keeping it hot for 30 min after brewing."></textarea>
+        <div class="fu-hint">📌 This is the <strong>functional unit</strong> — from the paper's Step 3. It defines the scope of your analysis and ensures fair comparisons between design alternatives.</div>
+      </div>
+
+      <!-- Score summary -->
+      <div class="score-bar">
+        <div class="score-pill">
+          <div class="label">Production <span class="tooltip">ℹ<span class="tip-text">Environmental impact of extracting raw materials and manufacturing the product.</span></span></div>
+          <div class="value" id="score-production">0</div>
+          <div class="unit">mPt</div>
+        </div>
+        <div class="score-pill">
+          <div class="label">Use <span class="tooltip">ℹ<span class="tip-text">Environmental impact of energy and materials consumed while the product is in use over its lifetime.</span></span></div>
+          <div class="value" id="score-use">0</div>
+          <div class="unit">mPt</div>
+        </div>
+        <div class="score-pill">
+          <div class="label">Disposal <span class="tooltip">ℹ<span class="tip-text">Environmental impact (or benefit) of end-of-life treatment. Negative scores mean recycling gives a net environmental benefit.</span></span></div>
+          <div class="value" id="score-disposal">0</div>
+          <div class="unit">mPt</div>
+        </div>
+        <div class="score-pill total">
+          <div class="label">Total Score</div>
+          <div class="value" id="score-total">0</div>
+          <div class="unit">millipoints (mPt)</div>
+        </div>
+      </div>
+
+      <!-- Phase tabs -->
+      <div class="phase-tabs">
+        <button class="phase-tab active" data-phase="production">⚙️ Production</button>
+        <button class="phase-tab" data-phase="use">🔌 Use</button>
+        <button class="phase-tab" data-phase="disposal">♻️ Disposal</button>
+        <button class="phase-tab" data-phase="charts">📊 Charts &amp; Results</button>
+      </div>
+
+      <!-- Production -->
+      <div class="phase-section active" id="phase-production">
+        <div class="phase-intro">
+          <strong>Production phase:</strong> List all the <strong>materials</strong> your product is made of, any <strong>manufacturing processes</strong> applied to them (injection moulding, extrusion, pressing, etc.), and any <strong>transport</strong> involved. Enter the quantity for each — the Eco-indicator value is looked up automatically from the paper's tables.
+        </div>
+        <div class="entry-table">
+          <table>
+            <thead><tr>
+              <th style="width:36%">Material / Process</th>
+              <th style="width:18%">Amount</th>
+              <th style="width:16%">Unit</th>
+              <th style="width:20%">Indicator (mPt/unit)</th>
+              <th style="width:10%">Score (mPt)</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="rows-production"></tbody>
+            <tfoot><tr class="phase-total-row">
+              <td colspan="4" style="text-align:right;padding-right:20px">Production Total</td>
+              <td id="total-production">0</td><td></td>
+            </tr></tfoot>
+          </table>
+        </div>
+        <button class="btn-add-row" data-phase="production">＋ Add Material or Process</button>
+      </div>
+
+      <!-- Use -->
+      <div class="phase-section" id="phase-use">
+        <div class="phase-intro">
+          <strong>Use phase:</strong> Enter all the <strong>energy consumed</strong> during the product's lifetime (electricity, gas, etc.), any <strong>consumable materials</strong> used regularly (filters, ink, etc.), and related <strong>transport</strong>. Think about the full lifetime defined in your functional unit.
+        </div>
+        <div class="entry-table">
+          <table>
+            <thead><tr>
+              <th style="width:36%">Energy / Material / Process</th>
+              <th style="width:18%">Amount</th>
+              <th style="width:16%">Unit</th>
+              <th style="width:20%">Indicator (mPt/unit)</th>
+              <th style="width:10%">Score (mPt)</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="rows-use"></tbody>
+            <tfoot><tr class="phase-total-row">
+              <td colspan="4" style="text-align:right;padding-right:20px">Use Total</td>
+              <td id="total-use">0</td><td></td>
+            </tr></tfoot>
+          </table>
+        </div>
+        <button class="btn-add-row" data-phase="use">＋ Add Energy or Material</button>
+      </div>
+
+      <!-- Disposal -->
+      <div class="phase-section" id="phase-disposal">
+        <div class="phase-intro">
+          <strong>Disposal phase:</strong> For each material, choose how it will be disposed of at end of life — <strong>municipal waste, landfill, incineration, household recycling, or material recycling</strong>. Recycling entries often show negative scores — this is correct and means a net environmental benefit (the recycled material avoids production of virgin material elsewhere).
+        </div>
+        <div class="entry-table">
+          <table>
+            <thead><tr>
+              <th style="width:36%">Material + Disposal Method</th>
+              <th style="width:18%">Amount</th>
+              <th style="width:16%">Unit</th>
+              <th style="width:20%">Indicator (mPt/unit)</th>
+              <th style="width:10%">Score (mPt)</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="rows-disposal"></tbody>
+            <tfoot><tr class="phase-total-row">
+              <td colspan="4" style="text-align:right;padding-right:20px">Disposal Total</td>
+              <td id="total-disposal">0</td><td></td>
+            </tr></tfoot>
+          </table>
+        </div>
+        <button class="btn-add-row" data-phase="disposal">＋ Add Disposal Entry</button>
+      </div>
+
+      <!-- Charts & Results (Step 5) -->
+      <div class="phase-section" id="phase-charts">
+        <div id="charts-section">
+          <div class="chart-card">
+            <h3>Score by Life Cycle Phase (mPt)</h3>
+            <canvas id="chart-phases" height="220"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Top Contributors to Total Score</h3>
+            <canvas id="chart-entries" height="220"></canvas>
+          </div>
+        </div>
+        <!-- Step 5: Interpret results -->
+        <div class="notes-box">
+          <label>Step 5 — Interpretation, Notes &amp; Conclusions
+            <span class="tooltip" style="color:#9a7d0a">ℹ<span class="tip-text">From the paper's Step 5: identify the dominant phase and processes, assess assumptions, check sensitivity, and propose design improvements.</span></span>
+          </label>
+          <textarea id="notes-input" rows="4" placeholder="Which phase dominates? Which material has the biggest impact? What assumptions did you make, and how sensitive is the result to them? What design changes might reduce the score?
+
+Example: The use phase dominates at 93% of total. Reducing electricity consumption (e.g. adding a thermos jug to eliminate the hot plate) would have the greatest environmental benefit. The polystyrene housing is the largest single material contributor in production."></textarea>
+        </div>
+      </div>
+
+    </div><!-- /editor -->
+
+    <!-- Compare view -->
+    <div id="compare-view">
+      <div class="compare-header">
+        <button id="btn-back">← Back</button>
+        <h2 style="font-size:1.2rem">Scenario Comparison</h2>
+      </div>
+      <div id="compare-grid-container" class="compare-grid"></div>
+      <div class="chart-card">
+        <h3>Total Score Comparison (mPt)</h3>
+        <canvas id="chart-compare" height="160"></canvas>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app-layout -->
+
+<!-- Material Search Dialog -->
+<div id="search-overlay">
+  <div id="search-dialog">
+    <header>
+      <h3>🔍 Select a Material or Process</h3>
+      <input id="search-input" type="text" placeholder="Search by name, category, or description…" autocomplete="off">
+    </header>
+    <div id="search-filter-row">
+      <select id="search-cat-filter">
+        <option value="">All categories</option>
+      </select>
+    </div>
+    <div id="search-results"></div>
+    <div id="search-footer">
+      <button id="btn-search-close">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// FIREBASE CONFIGURATION
+// Replace the empty object below with your Firebase config.
+// See SETUP-GUIDE.md for instructions.
+// ════════════════════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC3-DQaQqPPS2IQhJHPEYU2zvFcjoyzS6U",
+  authDomain: "eco99-calculator.firebaseapp.com",
+  databaseURL: "https://eco99-calculator-default-rtdb.firebaseio.com",
+  projectId: "eco99-calculator",
+  storageBucket: "eco99-calculator.firebasestorage.app",
+  messagingSenderId: "801808374154",
+  appId: "1:801808374154:web:dd51e4b73e923f313b5073"
+};
+
+const USE_FIREBASE = typeof FIREBASE_CONFIG.apiKey === 'string' && FIREBASE_CONFIG.apiKey.length > 0;
+
+// ════════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════════
+let db           = null;
+let currentUser  = localStorage.getItem('eco99_user') || '';
+let scenarios    = {};
+let activeId     = null;
+let chartPhases  = null;
+let chartEntries = null;
+let chartCompare = null;
+let syncTimer    = null;
+let _searchPhase = null;
+let _searchIdx   = null;
+
+// ════════════════════════════════════════════════════════════════════
+// FIREBASE
+// ════════════════════════════════════════════════════════════════════
+function initFirebase() {
+  if (!USE_FIREBASE) {
+    document.getElementById('config-banner').classList.add('show');
+    loadLocal();
+    return;
+  }
+  document.getElementById('config-banner').classList.remove('show');
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+    db.ref('scenarios').on('value', snap => {
+      const incoming = snap.val() || {};
+      // Merge: keep local edits if user is actively typing
+      const focused = document.activeElement;
+      const userTyping = focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA');
+      if (userTyping && activeId) {
+        // Update everything except the active scenario's text fields
+        Object.keys(incoming).forEach(id => {
+          if (id !== activeId) scenarios[id] = incoming[id];
+        });
+        // Still refresh scores from our local copy
+        const sc = scenarios[activeId];
+        if (sc) updateScores(sc);
+      } else {
+        scenarios = incoming;
+        if (activeId && scenarios[activeId]) renderEditor(activeId, false);
+      }
+      renderSidebarScenarios();
+      setSyncDot('synced');
+    });
+  } catch(e) {
+    console.error('Firebase error:', e);
+    loadLocal();
+  }
+}
+
+function setSyncDot(state) {
+  const d = document.getElementById('sync-dot');
+  d.className = '';
+  if (state) d.classList.add(state);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// LOCAL FALLBACK
+// ════════════════════════════════════════════════════════════════════
+function loadLocal() {
+  try { scenarios = JSON.parse(localStorage.getItem('eco99_scenarios') || '{}'); }
+  catch(e) { scenarios = {}; }
+  renderSidebarScenarios();
+}
+
+function saveLocal() {
+  localStorage.setItem('eco99_scenarios', JSON.stringify(scenarios));
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SCENARIO CRUD
+// ════════════════════════════════════════════════════════════════════
+function newScenario() {
+  const id = 'sc_' + Date.now();
+  const sc = {
+    id,
+    name: 'New Product Scenario',
+    description: '',
+    functionalUnit: '',
+    notes: '',
+    author: currentUser || 'Unknown',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    rows: { production: [], use: [], disposal: [] }
+  };
+  scenarios[id] = sc;
+  persistScenario(sc);
+  openScenario(id);
+}
+
+function persistScenario(sc) {
+  sc.updatedAt = Date.now();
+  setSyncDot('syncing');
+  if (USE_FIREBASE && db) {
+    db.ref('scenarios/' + sc.id).set(sc)
+      .then(() => setSyncDot('synced'))
+      .catch(() => setSyncDot(''));
+  } else {
+    saveLocal();
+    setSyncDot('synced');
+  }
+}
+
+function deleteScenario(id) {
+  if (!confirm('Delete this scenario? This cannot be undone.')) return;
+  delete scenarios[id];
+  if (USE_FIREBASE && db) {
+    db.ref('scenarios/' + id).remove();
+  } else {
+    saveLocal();
+  }
+  if (activeId === id) { activeId = null; showWelcome(); }
+  renderSidebarScenarios();
+}
+
+function saveDebounced() {
+  if (syncTimer) clearTimeout(syncTimer);
+  setSyncDot('syncing');
+  syncTimer = setTimeout(() => {
+    const sc = scenarios[activeId];
+    if (sc) persistScenario(sc);
+  }, 800);
+}
+
+function phaseTotal(rows) {
+  return (rows || []).reduce((s, r) => s + (parseFloat(r.score) || 0), 0);
+}
+
+function scenarioTotal(sc) {
+  return phaseTotal(sc.rows.production) + phaseTotal(sc.rows.use) + phaseTotal(sc.rows.disposal);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SIDEBAR
+// ════════════════════════════════════════════════════════════════════
+function renderSidebarScenarios() {
+  const list = document.getElementById('scenario-list');
+  const checkList = document.getElementById('compare-checklist');
+  const compareControls = document.getElementById('compare-controls');
+  const ids = Object.keys(scenarios).sort((a,b) => (scenarios[b].updatedAt||0) - (scenarios[a].updatedAt||0));
+
+  list.innerHTML = '';
+  checkList.innerHTML = '';
+
+  if (ids.length === 0) {
+    list.innerHTML = '<p style="font-size:.8rem;color:var(--grey-5);text-align:center;padding:20px 0">No scenarios yet.</p>';
+    compareControls.style.display = 'none';
+    return;
+  }
+
+  compareControls.style.display = ids.length >= 2 ? 'block' : 'none';
+
+  ids.forEach(id => {
+    const sc = scenarios[id];
+    const total = scenarioTotal(sc).toFixed(1);
+
+    const card = document.createElement('div');
+    card.className = 'scenario-card' + (id === activeId ? ' active' : '');
+    card.innerHTML =
+      '<div class="s-name">' + esc(sc.name) + '</div>' +
+      '<div class="s-meta">By ' + esc(sc.author || '—') + '</div>' +
+      '<div class="s-score">' + total + ' mPt total</div>' +
+      '<div class="s-actions">' +
+        '<button onclick="event.stopPropagation();openScenario(\'' + id + '\')">Open</button>' +
+        '<button class="btn-del" onclick="event.stopPropagation();deleteScenario(\'' + id + '\')">Delete</button>' +
+      '</div>';
+    card.addEventListener('click', () => openScenario(id));
+    list.appendChild(card);
+
+    const row = document.createElement('div');
+    row.className = 'compare-check';
+    row.innerHTML = '<input type="checkbox" id="cmp_' + id + '" value="' + id + '"><label for="cmp_' + id + '">' + esc(sc.name) + '</label>';
+    checkList.appendChild(row);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// OPEN / RENDER
+// ════════════════════════════════════════════════════════════════════
+function openScenario(id) {
+  activeId = id;
+  showEditor();
+  renderEditor(id, true);
+  renderSidebarScenarios();
+}
+
+function showEditor() {
+  document.getElementById('welcome').style.display = 'none';
+  document.getElementById('editor').style.display = 'block';
+  document.getElementById('compare-view').style.display = 'none';
+}
+
+function showWelcome() {
+  document.getElementById('welcome').style.display = 'flex';
+  document.getElementById('editor').style.display = 'none';
+  document.getElementById('compare-view').style.display = 'none';
+}
+
+function renderEditor(id, resetTab) {
+  const sc = scenarios[id];
+  if (!sc) return;
+  document.getElementById('scenario-name-input').value   = sc.name || '';
+  document.getElementById('scenario-desc-input').value   = sc.description || '';
+  document.getElementById('functional-unit-input').value = sc.functionalUnit || '';
+  document.getElementById('notes-input').value           = sc.notes || '';
+  document.getElementById('author-label').textContent    = sc.author ? 'Author: ' + sc.author : '';
+  renderRows('production', sc.rows.production || []);
+  renderRows('use',        sc.rows.use        || []);
+  renderRows('disposal',   sc.rows.disposal   || []);
+  updateScores(sc);
+  if (resetTab) switchTab('production');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ROWS
+// ════════════════════════════════════════════════════════════════════
+function renderRows(phase, rows) {
+  const tbody = document.getElementById('rows-' + phase);
+  tbody.innerHTML = '';
+  rows.forEach((row, idx) => tbody.appendChild(buildRowTR(phase, row, idx)));
+  updatePhaseTotal(phase);
+}
+
+function buildRowTR(phase, row, idx) {
+  const mat = row.materialId ? ECO99.get(row.materialId) : null;
+  const matName  = mat ? mat.name : null;
+  const indicator = mat ? mat.value : '';
+  const unit      = mat ? mat.unit  : '';
+  const score = mat ? (parseFloat(row.amount) || 0) * mat.value : 0;
+  const scoreClass = score < 0 ? 'negative' : '';
+
+  const tr = document.createElement('tr');
+  tr.dataset.idx = idx;
+  tr.innerHTML =
+    '<td><button style="width:100%;text-align:left;background:var(--grey-1);border:1px solid var(--grey-3);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.83rem" onclick="openSearch(\'' + phase + '\',' + idx + ')">' +
+      (matName ? esc(matName) : '<span style="color:var(--grey-5)">Click to select…</span>') +
+    '</button></td>' +
+    '<td><input type="number" min="0" step="any" value="' + (row.amount || '') + '" placeholder="0" oninput="updateAmount(\'' + phase + '\',' + idx + ',this.value)"></td>' +
+    '<td style="font-size:.78rem;color:var(--grey-5)">' + esc(unit) + '</td>' +
+    '<td style="font-size:.82rem;color:var(--grey-5)">' + (indicator !== '' ? indicator + ' mPt/' + esc(unit) : '') + '</td>' +
+    '<td><span class="result-val ' + scoreClass + '" id="score-cell-' + phase + '-' + idx + '">' + (score !== 0 ? score.toFixed(2) : '—') + '</span></td>' +
+    '<td><button class="btn-remove-row" onclick="removeRow(\'' + phase + '\',' + idx + ')" title="Remove">×</button></td>';
+  return tr;
+}
+
+function updateAmount(phase, idx, val) {
+  const sc = scenarios[activeId];
+  if (!sc) return;
+  sc.rows[phase][idx].amount = parseFloat(val) || 0;
+  recalcRow(sc, phase, idx);
+  saveDebounced();
+}
+
+function recalcRow(sc, phase, idx) {
+  const row = sc.rows[phase][idx];
+  const mat = row.materialId ? ECO99.get(row.materialId) : null;
+  row.score = mat ? (parseFloat(row.amount) || 0) * mat.value : 0;
+  // Update DOM cell directly (fast, avoids full re-render)
+  const cell = document.getElementById('score-cell-' + phase + '-' + idx);
+  if (cell) {
+    cell.textContent = row.score !== 0 ? row.score.toFixed(2) : '—';
+    cell.className = 'result-val' + (row.score < 0 ? ' negative' : '');
+  }
+  updatePhaseTotal(phase);
+  updateScores(sc);
+}
+
+function removeRow(phase, idx) {
+  const sc = scenarios[activeId];
+  if (!sc) return;
+  sc.rows[phase].splice(idx, 1);
+  renderRows(phase, sc.rows[phase]);
+  updateScores(sc);
+  saveDebounced();
+}
+
+function addRow(phase) {
+  const sc = scenarios[activeId];
+  if (!sc) return;
+  sc.rows[phase].push({ materialId: null, materialName: '', amount: 0, score: 0 });
+  const idx = sc.rows[phase].length - 1;
+  const tbody = document.getElementById('rows-' + phase);
+  tbody.appendChild(buildRowTR(phase, sc.rows[phase][idx], idx));
+  updatePhaseTotal(phase);
+  openSearch(phase, idx);
+}
+
+function updatePhaseTotal(phase) {
+  const sc = scenarios[activeId];
+  if (!sc) return;
+  const total = phaseTotal(sc.rows[phase]);
+  document.getElementById('total-' + phase).textContent = total.toFixed(2);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SCORES & CHARTS
+// ════════════════════════════════════════════════════════════════════
+function updateScores(sc) {
+  const p = phaseTotal(sc.rows.production);
+  const u = phaseTotal(sc.rows.use);
+  const d = phaseTotal(sc.rows.disposal);
+  const t = p + u + d;
+  document.getElementById('score-production').textContent = p.toFixed(1);
+  document.getElementById('score-use').textContent        = u.toFixed(1);
+  document.getElementById('score-disposal').textContent   = d.toFixed(1);
+  document.getElementById('score-total').textContent      = t.toFixed(1);
+  // Only redraw charts if charts tab is active
+  const chartsActive = document.getElementById('phase-charts').classList.contains('active');
+  if (chartsActive) updateCharts(sc, p, u, d);
+}
+
+function updateCharts(sc, p, u, d) {
+  const phaseCtx = document.getElementById('chart-phases').getContext('2d');
+  if (chartPhases) chartPhases.destroy();
+  chartPhases = new Chart(phaseCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Production', 'Use', 'Disposal'],
+      datasets: [{ label: 'mPt', data: [p, u, d], backgroundColor: ['#2d6a4f','#40916c','#74c69d'], borderRadius: 6 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'mPt' } } } }
+  });
+
+  const allRows = [
+    ...(sc.rows.production||[]).map(r => ({...r})),
+    ...(sc.rows.use||[]).map(r => ({...r})),
+    ...(sc.rows.disposal||[]).map(r => ({...r}))
+  ].filter(r => r.materialId && r.score !== 0)
+   .sort((a,b) => Math.abs(b.score) - Math.abs(a.score))
+   .slice(0, 10);
+
+  const entryCtx = document.getElementById('chart-entries').getContext('2d');
+  if (chartEntries) chartEntries.destroy();
+  chartEntries = new Chart(entryCtx, {
+    type: 'bar',
+    data: {
+      labels: allRows.map(r => { const n = ECO99.get(r.materialId)?.name||'?'; return n.length>22?n.slice(0,20)+'…':n; }),
+      datasets: [{ label: 'Score (mPt)', data: allRows.map(r => r.score), backgroundColor: allRows.map(r => r.score>=0?'#40916c':'#c0392b'), borderRadius: 4 }]
+    },
+    options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { title: { display: true, text: 'mPt' } } } }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// TABS
+// ════════════════════════════════════════════════════════════════════
+function switchTab(phase) {
+  document.querySelectorAll('.phase-tab').forEach(b => b.classList.toggle('active', b.dataset.phase === phase));
+  document.querySelectorAll('.phase-section').forEach(s => s.classList.toggle('active', s.id === 'phase-' + phase));
+  if (phase === 'charts') {
+    const sc = scenarios[activeId];
+    if (sc) updateCharts(sc, phaseTotal(sc.rows.production), phaseTotal(sc.rows.use), phaseTotal(sc.rows.disposal));
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SEARCH
+// ════════════════════════════════════════════════════════════════════
+function openSearch(phase, idx) {
+  _searchPhase = phase;
+  _searchIdx   = idx;
+  document.getElementById('search-input').value = '';
+  const catSelect = document.getElementById('search-cat-filter');
+  catSelect.innerHTML = '<option value="">All categories</option>';
+  ECO99.getCategories().forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat; opt.textContent = cat;
+    catSelect.appendChild(opt);
+  });
+  renderSearchResults('', '');
+  document.getElementById('search-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('search-input').focus(), 80);
+}
+
+function renderSearchResults(query, catFilter) {
+  const container = document.getElementById('search-results');
+  let results = query ? ECO99.search(query) : ECO99.materials;
+  if (catFilter) results = results.filter(m => m.category === catFilter);
+  if (results.length === 0) {
+    container.innerHTML = '<div class="no-results">No materials found. Try a different search term.</div>';
+    return;
+  }
+  container.innerHTML = results.map(m =>
+    '<div class="search-result-item" onclick="selectMaterial(\'' + m.id + '\')">' +
+      '<div>' +
+        '<div class="mat-name">' + esc(m.name) + '</div>' +
+        '<div class="mat-cat">' + esc(m.category) + '</div>' +
+        (m.description ? '<div class="mat-desc">' + esc(m.description) + '</div>' : '') +
+      '</div>' +
+      '<div>' +
+        '<div class="mat-val">' + m.value + ' mPt</div>' +
+        '<div class="mat-unit">per ' + esc(m.unit) + '</div>' +
+      '</div>' +
+    '</div>'
+  ).join('');
+}
+
+function selectMaterial(matId) {
+  const sc = scenarios[activeId];
+  if (!sc || _searchPhase === null || _searchIdx === null) return;
+  const mat = ECO99.get(matId);
+  if (!mat) return;
+  const row = sc.rows[_searchPhase][_searchIdx];
+  row.materialId   = matId;
+  row.materialName = mat.name;
+  row.score = (parseFloat(row.amount) || 0) * mat.value;
+  // Replace the row in DOM
+  const tbody = document.getElementById('rows-' + _searchPhase);
+  const oldTr = tbody.children[_searchIdx];
+  if (oldTr) tbody.replaceChild(buildRowTR(_searchPhase, row, _searchIdx), oldTr);
+  updatePhaseTotal(_searchPhase);
+  updateScores(sc);
+  saveDebounced();
+  closeSearch();
+}
+
+function closeSearch() {
+  document.getElementById('search-overlay').classList.remove('open');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// COMPARE
+// ════════════════════════════════════════════════════════════════════
+function openCompare() {
+  const checked = [...document.querySelectorAll('#compare-checklist input:checked')].map(i => i.value);
+  if (checked.length < 2) { alert('Please select at least 2 scenarios to compare.'); return; }
+  document.getElementById('welcome').style.display      = 'none';
+  document.getElementById('editor').style.display       = 'none';
+  document.getElementById('compare-view').style.display = 'block';
+
+  const grid = document.getElementById('compare-grid-container');
+  grid.innerHTML = '';
+  const labels = [], totals = [];
+  const colors = ['#2d6a4f','#40916c','#74c69d','#b7e4c7','#e07b2a','#c0392b'];
+
+  checked.forEach((id, i) => {
+    const sc = scenarios[id];
+    if (!sc) return;
+    const p = phaseTotal(sc.rows.production);
+    const u = phaseTotal(sc.rows.use);
+    const d = phaseTotal(sc.rows.disposal);
+    const t = p + u + d;
+    labels.push(sc.name);
+    totals.push(t);
+    const card = document.createElement('div');
+    card.className = 'compare-scenario-card';
+    card.style.borderColor = colors[i % colors.length];
+    card.innerHTML =
+      '<h3>' + esc(sc.name) + '</h3>' +
+      '<div class="compare-phase-row"><span class="phase-label">Production</span><span class="phase-val">' + p.toFixed(1) + ' mPt</span></div>' +
+      '<div class="compare-phase-row"><span class="phase-label">Use</span><span class="phase-val">' + u.toFixed(1) + ' mPt</span></div>' +
+      '<div class="compare-phase-row"><span class="phase-label">Disposal</span><span class="phase-val">' + d.toFixed(1) + ' mPt</span></div>' +
+      '<div class="compare-phase-row"><span class="phase-label">Total</span><span class="phase-val">' + t.toFixed(1) + ' mPt</span></div>';
+    grid.appendChild(card);
+  });
+
+  const cmpCtx = document.getElementById('chart-compare').getContext('2d');
+  if (chartCompare) chartCompare.destroy();
+  chartCompare = new Chart(cmpCtx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Total (mPt)', data: totals, backgroundColor: colors.slice(0, totals.length), borderRadius: 6 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'mPt' } } } }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ════════════════════════════════════════════════════════════════════
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// EVENT WIRING
+// ════════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+
+  // User join
+  document.getElementById('btn-set-user').addEventListener('click', function() {
+    const name = document.getElementById('user-name-input').value.trim();
+    if (!name) return;
+    currentUser = name;
+    localStorage.setItem('eco99_user', name);
+    document.getElementById('user-display').textContent = '👤 ' + name;
+    document.getElementById('user-display').style.display = 'inline';
+    document.getElementById('user-name-input').style.display = 'none';
+    document.getElementById('btn-set-user').style.display = 'none';
+  });
+
+  if (currentUser) {
+    document.getElementById('user-name-input').value = currentUser;
+    document.getElementById('btn-set-user').click();
+  }
+
+  // New scenario
+  document.getElementById('btn-new-scenario').addEventListener('click', function() {
+    if (!currentUser) { alert('Please enter your name first.'); return; }
+    newScenario();
+  });
+
+  // Scenario name
+  document.getElementById('scenario-name-input').addEventListener('input', function(e) {
+    const sc = scenarios[activeId]; if (!sc) return;
+    sc.name = e.target.value;
+    renderSidebarScenarios();
+    saveDebounced();
+  });
+
+  // Scenario description
+  document.getElementById('scenario-desc-input').addEventListener('input', function(e) {
+    const sc = scenarios[activeId]; if (!sc) return;
+    sc.description = e.target.value;
+    saveDebounced();
+  });
+
+  // Functional unit
+  document.getElementById('functional-unit-input').addEventListener('input', function(e) {
+    const sc = scenarios[activeId]; if (!sc) return;
+    sc.functionalUnit = e.target.value;
+    saveDebounced();
+  });
+
+  // Notes / conclusions
+  document.getElementById('notes-input').addEventListener('input', function(e) {
+    const sc = scenarios[activeId]; if (!sc) return;
+    sc.notes = e.target.value;
+    saveDebounced();
+  });
+
+  // Phase tabs
+  document.querySelectorAll('.phase-tab').forEach(function(btn) {
+    btn.addEventListener('click', function() { switchTab(btn.dataset.phase); });
+  });
+
+  // Add row buttons
+  document.querySelectorAll('.btn-add-row').forEach(function(btn) {
+    btn.addEventListener('click', function() { if (activeId) addRow(btn.dataset.phase); });
+  });
+
+  // Search input
+  document.getElementById('search-input').addEventListener('input', function(e) {
+    renderSearchResults(e.target.value, document.getElementById('search-cat-filter').value);
+  });
+  document.getElementById('search-cat-filter').addEventListener('change', function(e) {
+    renderSearchResults(document.getElementById('search-input').value, e.target.value);
+  });
+  document.getElementById('btn-search-close').addEventListener('click', closeSearch);
+  document.getElementById('search-overlay').addEventListener('click', function(e) {
+    if (e.target === document.getElementById('search-overlay')) closeSearch();
+  });
+
+  // Compare
+  document.getElementById('btn-compare').addEventListener('click', openCompare);
+  document.getElementById('btn-back').addEventListener('click', function() {
+    if (activeId) showEditor(); else showWelcome();
+  });
+
+  // Init Firebase / local
+  initFirebase();
+});
+</script>
+</body>
+</html>
