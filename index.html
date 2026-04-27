@@ -373,9 +373,10 @@ header p{font-size:.8rem;opacity:.85}
             <h3>Score by Life Cycle Phase (mPt)</h3>
             <canvas id="chart-phases" height="220"></canvas>
           </div>
-          <div class="chart-card">
+          <div class="chart-card" style="position:relative">
             <h3>Top Contributors to Total Score</h3>
             <canvas id="chart-entries" height="220"></canvas>
+            <div id="entries-tooltip" style="display:none;position:absolute;background:rgba(33,37,41,.92);color:#fff;padding:7px 11px;border-radius:7px;font-size:.82rem;pointer-events:none;white-space:nowrap;z-index:10;line-height:1.5"></div>
           </div>
         </div>
         <!-- Copy Work button -->
@@ -819,7 +820,40 @@ function updateCharts(sc, p, u, d) {
       labels: allRows.map(r => { const n = ECO99.get(r.materialId)?.name||'?'; return n.length>22?n.slice(0,20)+'…':n; }),
       datasets: [{ label: 'Score (mPt)', data: allRows.map(r => r.score), backgroundColor: allRows.map(r => r.score>=0?'#40916c':'#c0392b'), borderRadius: 4 }]
     },
-    options: { indexAxis: 'y', responsive: true, interaction: { mode: 'index', axis: 'y' }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function(items){ const r = allRows[items[0].dataIndex]; return ECO99.get(r.materialId)?.name || '?'; } } } }, scales: { x: { title: { display: true, text: 'mPt' } } } }
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      },
+      scales: { x: { title: { display: true, text: 'mPt' } } },
+      onHover: function(event, elements, chart) {
+        const tip = document.getElementById('entries-tooltip');
+        // Use 'y' mode to match any point in the row, not just the bar
+        const matches = chart.getElementsAtEventForMode(event.native, 'y', { intersect: false }, false);
+        if (matches.length > 0) {
+          const idx = matches[0].index;
+          const row = allRows[idx];
+          const mat = ECO99.get(row.materialId);
+          const fullName = mat ? mat.name : '?';
+          const score = (parseFloat(row.score) || 0).toFixed(2);
+          const canvas = chart.canvas.getBoundingClientRect();
+          tip.style.display = 'block';
+          tip.style.left = (event.native.clientX - canvas.left + 12) + 'px';
+          tip.style.top  = (event.native.clientY - canvas.top - 10) + 'px';
+          tip.innerHTML = '<strong>' + fullName + '</strong><br>Score: ' + score + ' mPt';
+        } else {
+          tip.style.display = 'none';
+        }
+      }
+    }
+  });
+
+  // Hide tooltip when mouse leaves the canvas
+  document.getElementById('chart-entries').addEventListener('mouseleave', function() {
+    const tip = document.getElementById('entries-tooltip');
+    if (tip) tip.style.display = 'none';
   });
 }
 
