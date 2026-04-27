@@ -819,7 +819,7 @@ function updateCharts(sc, p, u, d) {
       labels: allRows.map(r => { const n = ECO99.get(r.materialId)?.name||'?'; return n.length>22?n.slice(0,20)+'…':n; }),
       datasets: [{ label: 'Score (mPt)', data: allRows.map(r => r.score), backgroundColor: allRows.map(r => r.score>=0?'#40916c':'#c0392b'), borderRadius: 4 }]
     },
-    options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { title: { display: true, text: 'mPt' } } } }
+    options: { indexAxis: 'y', responsive: true, interaction: { mode: 'index', axis: 'y' }, plugins: { legend: { display: false }, tooltip: { callbacks: { title: function(items){ const r = allRows[items[0].dataIndex]; return ECO99.get(r.materialId)?.name || '?'; } } } }, scales: { x: { title: { display: true, text: 'mPt' } } } }
   });
 }
 
