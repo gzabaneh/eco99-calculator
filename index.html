@@ -472,7 +472,10 @@ function initFirebase() {
     firebase.initializeApp(FIREBASE_CONFIG);
     db = firebase.database();
     db.ref('scenarios').on('value', snap => {
-      const incoming = snap.val() || {};
+      const raw = snap.val() || {};
+      // Sanitize every incoming scenario so missing rows don't crash the app
+      const incoming = {};
+      Object.keys(raw).forEach(id => { incoming[id] = sanitizeScenario(raw[id]); });
       // Merge: keep local edits if user is actively typing
       const focused = document.activeElement;
       const userTyping = focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA');
@@ -571,11 +574,21 @@ function saveDebounced() {
   }, 800);
 }
 
+function sanitizeScenario(sc) {
+  if (!sc) return sc;
+  if (!sc.rows) sc.rows = {};
+  if (!Array.isArray(sc.rows.production)) sc.rows.production = [];
+  if (!Array.isArray(sc.rows.use))        sc.rows.use        = [];
+  if (!Array.isArray(sc.rows.disposal))   sc.rows.disposal   = [];
+  return sc;
+}
+
 function phaseTotal(rows) {
   return (rows || []).reduce((s, r) => s + (parseFloat(r.score) || 0), 0);
 }
 
 function scenarioTotal(sc) {
+  sanitizeScenario(sc);
   return phaseTotal(sc.rows.production) + phaseTotal(sc.rows.use) + phaseTotal(sc.rows.disposal);
 }
 
@@ -724,7 +737,7 @@ function removeRow(phase, idx) {
 }
 
 function addRow(phase) {
-  const sc = scenarios[activeId];
+  const sc = sanitizeScenario(scenarios[activeId]);
   if (!sc) return;
   sc.rows[phase].push({ materialId: null, materialName: '', amount: 0, score: 0 });
   const idx = sc.rows[phase].length - 1;
