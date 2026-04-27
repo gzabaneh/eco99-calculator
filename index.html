@@ -489,9 +489,9 @@ function initFirebase() {
         Object.keys(incoming).forEach(id => {
           if (id !== activeId) scenarios[id] = incoming[id];
         });
-        // Still refresh scores from our local copy
+        // Refresh scores from local copy but never redraw charts on a sync event
         const sc = scenarios[activeId];
-        if (sc) updateScores(sc);
+        if (sc) updateScoresOnly(sc);
       } else {
         scenarios = incoming;
         if (activeId && scenarios[activeId]) renderEditor(activeId, false);
@@ -762,7 +762,22 @@ function updatePhaseTotal(phase) {
 // ════════════════════════════════════════════════════════════════════
 // SCORES & CHARTS
 // ════════════════════════════════════════════════════════════════════
+function updateScoresOnly(sc) {
+  // Updates the score numbers only — never redraws charts.
+  // Use this for Firebase sync events to avoid chart flicker.
+  sanitizeScenario(sc);
+  const p = phaseTotal(sc.rows.production);
+  const u = phaseTotal(sc.rows.use);
+  const d = phaseTotal(sc.rows.disposal);
+  const t = p + u + d;
+  document.getElementById('score-production').textContent = p.toFixed(1);
+  document.getElementById('score-use').textContent        = u.toFixed(1);
+  document.getElementById('score-disposal').textContent   = d.toFixed(1);
+  document.getElementById('score-total').textContent      = t.toFixed(1);
+}
+
 function updateScores(sc) {
+  sanitizeScenario(sc);
   const p = phaseTotal(sc.rows.production);
   const u = phaseTotal(sc.rows.use);
   const d = phaseTotal(sc.rows.disposal);
